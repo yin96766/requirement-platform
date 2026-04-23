@@ -111,19 +111,6 @@ textarea {
   transform: translateX(2px);
 }
 
-.sidebar-card {
-  padding: 20px;
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.process-list {
-  padding-left: 20px;
-  margin: 12px 0 0;
-  display: grid;
-  gap: 8px;
-}
-
 .main-content {
   padding: 30px;
   display: flex;
