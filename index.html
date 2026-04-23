@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>需求管理平台</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">RM</div>
+        <div>
+          <h1>需求管理平台</h1>
+          <p>全生命周期可视化协同</p>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-section="dashboard">总览看板</button>
+        <button class="nav-item" data-section="intake">需求识别</button>
+        <button class="nav-item" data-section="requirements">需求看板</button>
+        <button class="nav-item" data-section="reviews">评审中心</button>
+        <button class="nav-item" data-section="delivery">落地推进</button>
+      </nav>
+
+      <section class="sidebar-card">
+        <h2>标准流程</h2>
+        <ol class="process-list">
+          <li>收集登记</li>
+          <li>需求梳理</li>
+          <li>评审决策</li>
+          <li>计划排期</li>
+          <li>交付验证</li>
+          <li>归档复盘</li>
+        </ol>
+      </section>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Requirement Lifecycle Hub</p>
+          <h2>统一收集、梳理、评审与交付</h2>
+        </div>
+        <div class="topbar-actions">
+          <button id="seedDataBtn" class="ghost-button">重置示例数据</button>
+          <button id="newRequirementBtn" class="primary-button">新建需求</button>
+        </div>
+      </header>
+
+      <section class="hero-card">
+        <div>
+          <p class="hero-label">平台目标</p>
+          <h3>让需求从提出到上线的每一步都可追踪、可量化、可复盘</h3>
+        </div>
+        <div class="hero-metrics" id="heroMetrics"></div>
+      </section>
+
+      <section class="panel active" id="dashboard">
+        <div class="panel-grid">
+          <article class="card">
+            <div class="card-header">
+              <h3>生命周期分布</h3>
+              <span class="hint">按当前状态统计</span>
+            </div>
+            <div id="statusStats" class="stats-grid"></div>
+          </article>
+
+          <article class="card">
+            <div class="card-header">
+              <h3>优先级聚焦</h3>
+              <span class="hint">高优先需求快速定位</span>
+            </div>
+            <div id="priorityList" class="stack-list"></div>
+          </article>
+        </div>
+
+        <div class="panel-grid">
+          <article class="card">
+            <div class="card-header">
+              <h3>状态流转看板</h3>
+              <span class="hint">拖动可直接变更状态</span>
+            </div>
+            <div id="kanbanBoard" class="kanban-board"></div>
+          </article>
+
+          <article class="card">
+            <div class="card-header">
+              <h3>推进风险</h3>
+              <span class="hint">待评审、延期与阻塞</span>
+            </div>
+            <div id="riskList" class="stack-list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" id="intake">
+        <div class="panel-grid intake-grid">
+          <article class="card">
+            <div class="card-header">
+              <h3>需求识别输入</h3>
+              <span class="hint">支持手动输入或导入文本文档，自动拆分并转换为多个结构化需求单</span>
+            </div>
+
+            <div class="intake-form">
+              <label>
+                <span>原始需求描述</span>
+                <textarea id="intakeInput" rows="12" placeholder="例如：门店店长反馈现在补货靠经验，经常出现热销商品断货。希望系统能结合历史销量、活动、天气给出补货建议，还要能让区域经理审核后回写 ERP。最好能在 5 月中旬前上线。"></textarea>
+              </label>
+
+              <section class="upload-panel">
+                <div class="upload-header">
+                  <div>
+                    <h4>文档导入</h4>
+                    <p class="item-meta">支持 `txt`、`md`、`csv`、`json`，可多选并批量拆分需求</p>
+                  </div>
+                </div>
+                <input id="intakeFileInput" class="file-input" type="file" multiple accept=".txt,.md,.markdown,.csv,.json,.docx,.xlsx,.xls">
+                <p class="item-meta">支持 `txt`、`md`、`csv`、`json`、`docx`、`xlsx`、`xls`。旧版 `doc` 暂未支持。</p>
+                <div id="intakeImportSummary" class="board-summary"></div>
+              </section>
+
+              <section class="upload-panel">
+                <div class="upload-header">
+                  <div>
+                    <h4>导入历史</h4>
+                    <p class="item-meta">保存最近导入成功的文档记录，支持查找、恢复和删除。</p>
+                  </div>
+                </div>
+                <div class="toolbar compact-toolbar history-toolbar">
+                  <input id="importHistorySearchInput" type="search" placeholder="搜索文件名或来源">
+                  <div id="importHistorySummary" class="board-summary compact-summary"></div>
+                  <button id="clearImportHistoryBtn" class="ghost-button" type="button">清空历史</button>
+                </div>
+                <div id="importHistoryList" class="history-list"></div>
+              </section>
+
+              <div class="intake-actions">
+                <button id="analyzeRequirementBtn" class="primary-button">识别并转换</button>
+                <button id="loadDemoPromptBtn" class="ghost-button">填充示例</button>
+                <button id="clearIntakeBtn" class="ghost-button">清空输入</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-header">
+              <h3>结构化输出</h3>
+              <span class="hint">面向产品、研发和评审环节的统一表达，支持单条或批量生成需求单</span>
+            </div>
+
+            <div id="intakeResult" class="empty-state">
+              <h4>尚未生成需求说明</h4>
+              <p class="item-meta">输入自然语言或导入文档后，这里会生成标准化标题、背景、目标、范围、验收与风险建议，并支持批量生成需求单。</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" id="requirements">
+        <article class="card">
+          <div class="card-header">
+            <h3>需求看板</h3>
+            <span class="hint">按状态分列管理，支持筛选、拖拽、编辑与删除</span>
+          </div>
+
+          <div class="toolbar">
+            <input id="searchInput" type="search" placeholder="搜索标题、提出部门、负责人">
+            <select id="typeFilter">
+              <option value="all">全部类型</option>
+            </select>
+            <select id="statusFilter">
+              <option value="all">全部状态</option>
+            </select>
+            <select id="priorityFilter">
+              <option value="all">全部优先级</option>
+            </select>
+          </div>
+
+          <div class="board-summary" id="requirementsBoardSummary"></div>
+          <div id="requirementsBoard" class="kanban-board requirements-board"></div>
+          <div id="requirementsEmptyState" class="empty-state hidden">
+            <h4>没有符合筛选条件的需求</h4>
+            <p class="item-meta">调整筛选条件后再试，或新建一个需求。</p>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel" id="reviews">
+        <div class="panel-grid">
+          <article class="card">
+            <div class="card-header">
+              <h3>待评审队列</h3>
+              <span class="hint">关注缺口与决策节点</span>
+            </div>
+            <div class="toolbar compact-toolbar">
+              <input id="reviewSearchInput" type="search" placeholder="搜索标题、部门、负责人">
+              <select id="reviewStatusFilter">
+                <option value="all">全部状态</option>
+              </select>
+              <select id="reviewTypeFilter">
+                <option value="all">全部类型</option>
+              </select>
+            </div>
+            <div id="reviewQueue" class="stack-list"></div>
+          </article>
+
+          <article class="card">
+            <div class="card-header">
+              <h3>评审记录</h3>
+              <span class="hint">结论、参与人、时间留痕</span>
+            </div>
+            <div class="toolbar compact-toolbar">
+              <input id="reviewHistorySearchInput" type="search" placeholder="搜索标题、评审结论">
+              <select id="reviewHistoryOwnerFilter">
+                <option value="all">全部负责人</option>
+              </select>
+              <select id="reviewHistoryPriorityFilter">
+                <option value="all">全部优先级</option>
+              </select>
+            </div>
+            <div id="reviewHistory" class="timeline-list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" id="delivery">
+        <div class="panel-grid">
+          <article class="card">
+            <div class="card-header">
+              <h3>实施排期</h3>
+              <span class="hint">按计划时间排序</span>
+            </div>
+            <div class="toolbar compact-toolbar">
+              <input id="deliverySearchInput" type="search" placeholder="搜索标题、部门、负责人">
+              <select id="deliveryStatusFilter">
+                <option value="all">全部状态</option>
+              </select>
+              <select id="deliveryOwnerFilter">
+                <option value="all">全部负责人</option>
+              </select>
+            </div>
+            <div id="deliveryTimeline" class="timeline-list"></div>
+          </article>
+
+          <article class="card">
+            <div class="card-header">
+              <h3>审计日志</h3>
+              <span class="hint">全过程可追溯</span>
+            </div>
+            <div class="toolbar compact-toolbar">
+              <input id="auditSearchInput" type="search" placeholder="搜索标题、日志内容">
+              <select id="auditStatusFilter">
+                <option value="all">全部状态</option>
+              </select>
+              <select id="auditTypeFilter">
+                <option value="all">全部类型</option>
+              </select>
+            </div>
+            <div id="auditLog" class="timeline-list"></div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="requirementDialog" class="modal">
+    <form id="requirementForm" class="modal-content" method="dialog">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">Requirement Form</p>
+          <h3 id="dialogTitle">新建需求</h3>
+        </div>
+        <button type="button" id="closeDialogBtn" class="icon-button">×</button>
+      </div>
+
+      <div class="form-grid">
+        <label>
+          <span>需求标题</span>
+          <input name="title" required>
+        </label>
+        <label>
+          <span>需求类型</span>
+          <select name="type" required></select>
+        </label>
+        <label>
+          <span>优先级</span>
+          <select name="priority" required></select>
+        </label>
+        <label>
+          <span>当前状态</span>
+          <select name="status" required></select>
+        </label>
+        <label>
+          <span>提出部门</span>
+          <input name="department" required>
+        </label>
+        <label>
+          <span>负责人</span>
+          <input name="owner" required>
+        </label>
+        <label>
+          <span>提出日期</span>
+          <input name="submittedAt" type="date" required>
+        </label>
+        <label>
+          <span>计划上线</span>
+          <input name="plannedRelease" type="date" required>
+        </label>
+        <label class="full-span">
+          <span>业务背景</span>
+          <textarea name="background" rows="3" required></textarea>
+        </label>
+        <label class="full-span">
+          <span>需求描述</span>
+          <textarea name="description" rows="4" required></textarea>
+        </label>
+        <label class="full-span">
+          <span>验收标准</span>
+          <textarea name="acceptanceCriteria" rows="4" placeholder="建议写清功能完成条件、数据口径和异常场景"></textarea>
+        </label>
+        <label class="full-span">
+          <span>技术说明</span>
+          <textarea name="technicalNotes" rows="4" placeholder="可填写系统边界、接口、数据、性能或兼容性要求"></textarea>
+        </label>
+        <label class="full-span">
+          <span>评审结论</span>
+          <textarea name="reviewNotes" rows="3" placeholder="可填写评审结论、风险点与依赖项"></textarea>
+        </label>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="ghost-button" id="cancelDialogBtn">取消</button>
+        <button type="submit" class="primary-button">保存需求</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="detailDialog" class="modal">
+    <div class="modal-content detail-modal-content">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">Requirement Detail</p>
+          <h3 id="detailTitle">需求详情</h3>
+          <p id="detailSubtitle" class="hint"></p>
+        </div>
+        <button type="button" id="closeDetailDialogBtn" class="icon-button">×</button>
+      </div>
+
+      <div id="detailContent" class="detail-layout"></div>
+
+      <div class="modal-footer">
+        <button type="button" class="ghost-button" id="detailEditBtn">编辑需求</button>
+        <button type="button" class="primary-button" id="detailCloseBtn">关闭</button>
+      </div>
+    </div>
+  </dialog>
+
+  <template id="requirementCardTemplate">
+    <article class="requirement-card" draggable="true">
+      <div class="card-topline">
+        <span class="badge badge-type"></span>
+        <span class="badge badge-priority"></span>
+      </div>
+      <h4></h4>
+      <p class="card-meta"></p>
+      <button class="text-button">查看详情</button>
+    </article>
+  </template>
+
+  <script src="https://unpkg.com/mammoth/mammoth.browser.min.js"></script>
+  <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
