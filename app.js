@@ -5,6 +5,7 @@ const MAX_IMPORT_HISTORY = 20;
 const STATUS_OPTIONS = ["待评审", "设计中", "开发中", "已阻塞", "已上线", "已归档"];
 const TYPE_OPTIONS = ["业务需求", "产品需求", "项目需求", "流程优化", "系统改造"];
 const PRIORITY_OPTIONS = ["P0", "P1", "P2", "P3"];
+const REVIEW_STATUS_OPTIONS = ["待评审", "评审中", "已评审", "开发中", "待验证", "已上线"];
 
 const seedRequirements = [
   {
@@ -105,28 +106,10 @@ const seedRequirements = [
 
 const state = {
   requirements: loadState(),
-  activeSection: "dashboard",
+  activeSection: "intake",
   filters: {
     search: "",
-    type: "all",
-    status: "all",
-    priority: "all"
-  },
-  reviewFilters: {
-    queueSearch: "",
-    queueStatus: "all",
-    queueType: "all",
-    historySearch: "",
-    historyOwner: "all",
-    historyPriority: "all"
-  },
-  deliveryFilters: {
-    timelineSearch: "",
-    timelineStatus: "all",
-    timelineOwner: "all",
-    auditSearch: "",
-    auditStatus: "all",
-    auditType: "all"
+    reviewStatus: "all"
   },
   importHistorySearch: "",
   editingId: null,
@@ -137,30 +120,9 @@ const state = {
 };
 
 const elements = {
-  heroMetrics: document.getElementById("heroMetrics"),
-  statusStats: document.getElementById("statusStats"),
-  priorityList: document.getElementById("priorityList"),
-  riskList: document.getElementById("riskList"),
-  kanbanBoard: document.getElementById("kanbanBoard"),
   requirementsBoard: document.getElementById("requirementsBoard"),
   requirementsBoardSummary: document.getElementById("requirementsBoardSummary"),
   requirementsEmptyState: document.getElementById("requirementsEmptyState"),
-  reviewQueue: document.getElementById("reviewQueue"),
-  reviewHistory: document.getElementById("reviewHistory"),
-  deliveryTimeline: document.getElementById("deliveryTimeline"),
-  auditLog: document.getElementById("auditLog"),
-  reviewSearchInput: document.getElementById("reviewSearchInput"),
-  reviewStatusFilter: document.getElementById("reviewStatusFilter"),
-  reviewTypeFilter: document.getElementById("reviewTypeFilter"),
-  reviewHistorySearchInput: document.getElementById("reviewHistorySearchInput"),
-  reviewHistoryOwnerFilter: document.getElementById("reviewHistoryOwnerFilter"),
-  reviewHistoryPriorityFilter: document.getElementById("reviewHistoryPriorityFilter"),
-  deliverySearchInput: document.getElementById("deliverySearchInput"),
-  deliveryStatusFilter: document.getElementById("deliveryStatusFilter"),
-  deliveryOwnerFilter: document.getElementById("deliveryOwnerFilter"),
-  auditSearchInput: document.getElementById("auditSearchInput"),
-  auditStatusFilter: document.getElementById("auditStatusFilter"),
-  auditTypeFilter: document.getElementById("auditTypeFilter"),
   intakeFileInput: document.getElementById("intakeFileInput"),
   intakeImportSummary: document.getElementById("intakeImportSummary"),
   importHistorySearchInput: document.getElementById("importHistorySearchInput"),
@@ -168,10 +130,8 @@ const elements = {
   importHistoryList: document.getElementById("importHistoryList"),
   intakeInput: document.getElementById("intakeInput"),
   intakeResult: document.getElementById("intakeResult"),
-  searchInput: document.getElementById("searchInput"),
-  typeFilter: document.getElementById("typeFilter"),
-  statusFilter: document.getElementById("statusFilter"),
-  priorityFilter: document.getElementById("priorityFilter"),
+  listSearchInput: document.getElementById("listSearchInput"),
+  listReviewStatusFilter: document.getElementById("listReviewStatusFilter"),
   requirementDialog: document.getElementById("requirementDialog"),
   requirementForm: document.getElementById("requirementForm"),
   dialogTitle: document.getElementById("dialogTitle"),
@@ -199,7 +159,7 @@ function loadState() {
   }
 
   try {
-    return JSON.parse(stored);
+    return cloneRequirements(JSON.parse(stored));
   } catch {
     const seeded = cloneRequirements(seedRequirements);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded));
@@ -228,20 +188,14 @@ function saveImportHistory() {
 }
 
 function hydrateSelectOptions() {
-  fillSelect(elements.typeFilter, ["all", ...TYPE_OPTIONS], "全部类型");
-  fillSelect(elements.statusFilter, ["all", ...STATUS_OPTIONS], "全部状态");
-  fillSelect(elements.priorityFilter, ["all", ...PRIORITY_OPTIONS], "全部优先级");
-  fillSelect(elements.reviewStatusFilter, ["all", ...STATUS_OPTIONS], "全部状态");
-  fillSelect(elements.reviewTypeFilter, ["all", ...TYPE_OPTIONS], "全部类型");
-  fillSelect(elements.reviewHistoryPriorityFilter, ["all", ...PRIORITY_OPTIONS], "全部优先级");
-  fillSelect(elements.deliveryStatusFilter, ["all", ...STATUS_OPTIONS], "全部状态");
-  fillSelect(elements.auditStatusFilter, ["all", ...STATUS_OPTIONS], "全部状态");
-  fillSelect(elements.auditTypeFilter, ["all", ...TYPE_OPTIONS], "全部类型");
-  hydrateDynamicFilters();
+  if (elements.listReviewStatusFilter) {
+    fillSelect(elements.listReviewStatusFilter, ["all", ...REVIEW_STATUS_OPTIONS], "全部评审状态");
+    elements.listReviewStatusFilter.value = state.filters.reviewStatus;
+  }
 
   fillSelect(elements.requirementForm.elements.type, TYPE_OPTIONS);
   fillSelect(elements.requirementForm.elements.priority, PRIORITY_OPTIONS);
-  fillSelect(elements.requirementForm.elements.status, STATUS_OPTIONS);
+  fillSelect(elements.requirementForm.elements.reviewStatus, REVIEW_STATUS_OPTIONS);
 }
 
 function fillSelect(select, options, placeholder) {
@@ -254,101 +208,47 @@ function fillSelect(select, options, placeholder) {
   });
 }
 
-function hydrateDynamicFilters() {
-  const owners = [...new Set(state.requirements.map((item) => item.owner).filter(Boolean))];
-  fillSelect(elements.reviewHistoryOwnerFilter, ["all", ...owners], "全部负责人");
-  fillSelect(elements.deliveryOwnerFilter, ["all", ...owners], "全部负责人");
-  elements.reviewHistoryOwnerFilter.value = state.reviewFilters.historyOwner;
-  elements.deliveryOwnerFilter.value = state.deliveryFilters.timelineOwner;
-}
-
 function bindEvents() {
   document.querySelectorAll(".nav-item").forEach((button) => {
     button.addEventListener("click", () => switchSection(button.dataset.section));
   });
 
-  document.getElementById("newRequirementBtn").addEventListener("click", () => openForm());
-  document.getElementById("closeDialogBtn").addEventListener("click", closeForm);
-  document.getElementById("cancelDialogBtn").addEventListener("click", closeForm);
-  document.getElementById("closeDetailDialogBtn").addEventListener("click", closeDetailDialog);
-  document.getElementById("detailCloseBtn").addEventListener("click", closeDetailDialog);
-  document.getElementById("detailEditBtn").addEventListener("click", handleDetailEdit);
-  document.getElementById("seedDataBtn").addEventListener("click", resetSeedData);
-  document.getElementById("analyzeRequirementBtn").addEventListener("click", analyzeIntake);
-  document.getElementById("loadDemoPromptBtn").addEventListener("click", loadDemoPrompt);
-  document.getElementById("clearIntakeBtn").addEventListener("click", clearIntakeInput);
-  document.getElementById("clearImportHistoryBtn").addEventListener("click", clearImportHistory);
-  elements.intakeFileInput.addEventListener("change", handleFileImport);
-  elements.importHistorySearchInput.addEventListener("input", (event) => {
-    state.importHistorySearch = event.target.value.trim();
-    renderImportHistory();
-  });
+  const newRequirementButton = document.getElementById("newRequirementBtn");
+  if (newRequirementButton) newRequirementButton.addEventListener("click", () => openForm());
 
-  elements.searchInput.addEventListener("input", (event) => {
-    state.filters.search = event.target.value.trim();
+  document.getElementById("closeDialogBtn")?.addEventListener("click", closeForm);
+  document.getElementById("cancelDialogBtn")?.addEventListener("click", closeForm);
+  document.getElementById("closeDetailDialogBtn")?.addEventListener("click", closeDetailDialog);
+  document.getElementById("detailCloseBtn")?.addEventListener("click", closeDetailDialog);
+  document.getElementById("detailEditBtn")?.addEventListener("click", handleDetailEdit);
+  document.getElementById("seedDataBtn")?.addEventListener("click", resetSeedData);
+  document.getElementById("analyzeRequirementBtn")?.addEventListener("click", analyzeIntake);
+  document.getElementById("loadDemoPromptBtn")?.addEventListener("click", loadDemoPrompt);
+  document.getElementById("clearIntakeBtn")?.addEventListener("click", clearIntakeInput);
+  document.getElementById("clearImportHistoryBtn")?.addEventListener("click", clearImportHistory);
+
+  if (elements.intakeFileInput) {
+    elements.intakeFileInput.addEventListener("change", handleFileImport);
+  }
+  if (elements.importHistorySearchInput) {
+    elements.importHistorySearchInput.addEventListener("input", (event) => {
+      state.importHistorySearch = event.target.value.trim();
+      renderImportHistory();
+    });
+  }
+
+  if (elements.listSearchInput) {
+    elements.listSearchInput.addEventListener("input", (event) => {
+      state.filters.search = event.target.value.trim();
+      renderRequirementsBoard();
+    });
+  }
+  elements.listReviewStatusFilter?.addEventListener("change", (event) => {
+    state.filters.reviewStatus = event.target.value;
     renderRequirementsBoard();
   });
 
-  [elements.typeFilter, elements.statusFilter, elements.priorityFilter].forEach((select) => {
-    select.addEventListener("change", () => {
-      state.filters.type = elements.typeFilter.value;
-      state.filters.status = elements.statusFilter.value;
-      state.filters.priority = elements.priorityFilter.value;
-      renderRequirementsBoard();
-    });
-  });
-
-  elements.reviewSearchInput.addEventListener("input", (event) => {
-    state.reviewFilters.queueSearch = event.target.value.trim();
-    renderReviews();
-  });
-  elements.reviewStatusFilter.addEventListener("change", (event) => {
-    state.reviewFilters.queueStatus = event.target.value;
-    renderReviews();
-  });
-  elements.reviewTypeFilter.addEventListener("change", (event) => {
-    state.reviewFilters.queueType = event.target.value;
-    renderReviews();
-  });
-  elements.reviewHistorySearchInput.addEventListener("input", (event) => {
-    state.reviewFilters.historySearch = event.target.value.trim();
-    renderReviews();
-  });
-  elements.reviewHistoryOwnerFilter.addEventListener("change", (event) => {
-    state.reviewFilters.historyOwner = event.target.value;
-    renderReviews();
-  });
-  elements.reviewHistoryPriorityFilter.addEventListener("change", (event) => {
-    state.reviewFilters.historyPriority = event.target.value;
-    renderReviews();
-  });
-
-  elements.deliverySearchInput.addEventListener("input", (event) => {
-    state.deliveryFilters.timelineSearch = event.target.value.trim();
-    renderDelivery();
-  });
-  elements.deliveryStatusFilter.addEventListener("change", (event) => {
-    state.deliveryFilters.timelineStatus = event.target.value;
-    renderDelivery();
-  });
-  elements.deliveryOwnerFilter.addEventListener("change", (event) => {
-    state.deliveryFilters.timelineOwner = event.target.value;
-    renderDelivery();
-  });
-  elements.auditSearchInput.addEventListener("input", (event) => {
-    state.deliveryFilters.auditSearch = event.target.value.trim();
-    renderDelivery();
-  });
-  elements.auditStatusFilter.addEventListener("change", (event) => {
-    state.deliveryFilters.auditStatus = event.target.value;
-    renderDelivery();
-  });
-  elements.auditTypeFilter.addEventListener("change", (event) => {
-    state.deliveryFilters.auditType = event.target.value;
-    renderDelivery();
-  });
-
-  elements.requirementForm.addEventListener("submit", handleFormSubmit);
+  elements.requirementForm?.addEventListener("submit", handleFormSubmit);
 }
 
 function switchSection(sectionId) {
@@ -362,16 +262,10 @@ function switchSection(sectionId) {
 }
 
 function render() {
-  renderHeroMetrics();
-  renderStatusStats();
-  renderPriorityList();
-  renderRiskList();
-  renderKanban();
-  renderRequirementsBoard();
-  renderReviews();
-  renderDelivery();
   renderIntakeResult();
   renderImportHistory();
+  renderRequirementsBoard();
+  switchSection(state.activeSection);
 }
 
 function renderHeroMetrics() {
@@ -482,40 +376,57 @@ function renderRequirementCard(item, options = {}) {
 function renderRequirementsBoard() {
   const rows = getFilteredRequirements();
   elements.requirementsBoardSummary.innerHTML = [
-    `<span class="badge badge-type">共 ${rows.length} 条</span>`,
-    state.filters.type !== "all" ? `<span class="badge badge-type">类型 ${state.filters.type}</span>` : "",
-    state.filters.status !== "all" ? `<span class="badge badge-type">状态 ${state.filters.status}</span>` : "",
-    state.filters.priority !== "all" ? `<span class="badge badge-type">优先级 ${state.filters.priority}</span>` : ""
+    `<span class="badge badge-type">共 ${rows.length} 条需求单</span>`,
+    state.filters.reviewStatus !== "all" ? `<span class="badge badge-type">评审状态 ${state.filters.reviewStatus}</span>` : ""
   ].join("");
 
   elements.requirementsEmptyState.classList.toggle("hidden", rows.length !== 0);
-  elements.requirementsBoard.innerHTML = STATUS_OPTIONS.map((status) => {
-    const items = rows.filter((item) => item.status === status);
-    return `
-      <section class="kanban-column" data-status="${status}">
-        <div class="column-header">
-          <strong>${status}</strong>
-          <span class="hint">${items.length}</span>
-        </div>
-        <div class="column-body" data-status="${status}">
-          ${items.map((item) => renderRequirementCard(item, { includeDelete: true })).join("")}
-        </div>
-      </section>
-    `;
-  }).join("");
-
+  elements.requirementsBoard.innerHTML = rows
+    .map((item) => renderRequirementTableRow(item))
+    .join("");
   bindInlineActions();
-  bindDragAndDrop();
 }
 
 function getFilteredRequirements() {
   return state.requirements.filter((item) => {
-    const hitSearch = !state.filters.search || [item.title, item.department, item.owner].some((field) => field.includes(state.filters.search));
-    const hitType = state.filters.type === "all" || item.type === state.filters.type;
-    const hitStatus = state.filters.status === "all" || item.status === state.filters.status;
-    const hitPriority = state.filters.priority === "all" || item.priority === state.filters.priority;
-    return hitSearch && hitType && hitStatus && hitPriority;
+    const hitSearch = !state.filters.search || [
+      item.title,
+      item.product,
+      item.sourceProject,
+      item.requester
+    ].some((field) => String(field || "").includes(state.filters.search));
+    const hitReviewStatus = state.filters.reviewStatus === "all" || item.reviewStatus === state.filters.reviewStatus;
+    return hitSearch && hitReviewStatus;
   });
+}
+
+function renderRequirementTableRow(item) {
+  const reviewStatusClass = ["已评审", "开发中", "待验证", "已上线"].includes(item.reviewStatus) ? "is-created" : "is-pending";
+  return `
+    <tr>
+      <td>${item.product}</td>
+      <td>
+        <div class="generated-spec-title-cell">
+          <strong>${item.title}</strong>
+          <p title="${item.id}">${item.id}</p>
+        </div>
+      </td>
+      <td>${item.sourceProject}</td>
+      <td>${item.requester}</td>
+      <td>${item.submittedAt}</td>
+      <td>${item.deliveryDirector}</td>
+      <td>${item.devManager}</td>
+      <td>${item.productManager}</td>
+      <td><span class="generated-status-chip ${reviewStatusClass}">${item.reviewStatus}</span></td>
+      <td>
+        <div class="generated-spec-row-actions">
+          <button class="ghost-button" data-action="view" data-id="${item.id}">查看</button>
+          <button class="ghost-button" data-action="edit" data-id="${item.id}">编辑</button>
+          <button class="ghost-button" data-action="delete" data-id="${item.id}">删除</button>
+        </div>
+      </td>
+    </tr>
+  `;
 }
 
 function renderReviews() {
@@ -680,69 +591,39 @@ function getFilteredImportHistory() {
 }
 
 function renderGeneratedSpecCard(spec, index) {
-  const createdLabel = spec.createdRequirementId
-    ? `<span class="created-note">已生成 ${spec.createdRequirementId}</span>`
-    : `<span class="item-meta">待生成需求单</span>`;
+  const sourceLabel = [spec.sourceName || "手动输入", spec.sourceBlockLabel].filter(Boolean).join(" / ");
+  const generationLabel = spec.createdRequirementId ? `已生成 ${spec.createdRequirementId}` : "待生成";
 
   return `
-    <details class="spec-panel generated-spec-card" ${index === 0 ? "open" : ""}>
-      <summary class="generated-spec-summary">
+    <article class="generated-spec-card-lite">
+      <div class="generated-spec-card-top">
         <div>
           <h4>${index + 1}. ${spec.title}</h4>
           <p class="item-meta">${spec.summary}</p>
-          <div class="generated-spec-meta">
-            <span class="badge source-badge">${spec.sourceName || "手动输入"}</span>
-            ${spec.sourceBlockLabel ? `<span class="badge source-badge">${spec.sourceBlockLabel}</span>` : ""}
-            ${createdLabel}
-          </div>
         </div>
         <div class="spec-highlight">
           <span class="badge badge-type">${spec.type}</span>
           <span class="badge badge-priority" data-priority="${spec.priority}">${spec.priority}</span>
           <span class="status-badge" data-status="${spec.status}">${spec.status}</span>
         </div>
-      </summary>
-
-      <div class="generated-spec-content">
-        <div class="spec-grid">
-          <div class="stack-item">
-            <h4>业务背景</h4>
-            <p>${spec.background}</p>
-          </div>
-          <div class="stack-item">
-            <h4>产品目标</h4>
-            <p>${spec.goal}</p>
-          </div>
-          <div class="stack-item">
-            <h4>功能范围</h4>
-            <ol class="spec-list">${spec.scope.map((item) => `<li>${item}</li>`).join("")}</ol>
-          </div>
-          <div class="stack-item">
-            <h4>角色与流程</h4>
-            <ol class="spec-list">${spec.process.map((item) => `<li>${item}</li>`).join("")}</ol>
-          </div>
-          <div class="stack-item">
-            <h4>验收标准</h4>
-            <ol class="spec-list">${spec.acceptanceCriteria.map((item) => `<li>${item}</li>`).join("")}</ol>
-          </div>
-          <div class="stack-item">
-            <h4>技术说明</h4>
-            <ol class="spec-list">${spec.technicalNotes.map((item) => `<li>${item}</li>`).join("")}</ol>
-          </div>
-        </div>
-
-        <div class="stack-item">
-          <h4>评审与风险提示</h4>
-          <ol class="spec-list">${spec.reviewNotes.map((item) => `<li>${item}</li>`).join("")}</ol>
-        </div>
-
-        <div class="spec-actions">
-          <button class="primary-button" data-action="create-single-spec" data-spec-id="${spec.draftId}" ${spec.createdRequirementId ? "disabled" : ""}>${spec.createdRequirementId ? "已生成" : "生成需求单"}</button>
-          <button class="ghost-button" data-action="edit-single-spec" data-spec-id="${spec.draftId}">编辑后生成</button>
-          <button class="ghost-button" data-action="copy-single-spec" data-spec-id="${spec.draftId}">复制单条说明</button>
-        </div>
       </div>
-    </details>
+      <div class="generated-spec-meta">
+        <span class="badge source-badge">${sourceLabel}</span>
+        <span class="generated-status-chip ${spec.createdRequirementId ? "is-created" : "is-pending"}">${generationLabel}</span>
+        <span class="badge badge-type">提出部门 ${spec.department}</span>
+        <span class="badge badge-type">负责人 ${spec.owner}</span>
+        <span class="badge badge-type">计划上线 ${spec.plannedRelease}</span>
+      </div>
+      <div class="generated-spec-card-note">
+        <p><strong>背景：</strong>${spec.background}</p>
+        <p><strong>目标：</strong>${spec.goal}</p>
+      </div>
+      <div class="generated-spec-row-actions">
+        <button class="primary-button" data-action="create-single-spec" data-spec-id="${spec.draftId}" ${spec.createdRequirementId ? "disabled" : ""}>${spec.createdRequirementId ? "已生成" : "生成需求单"}</button>
+        <button class="ghost-button" data-action="edit-single-spec" data-spec-id="${spec.draftId}">编辑后生成</button>
+        <button class="ghost-button" data-action="copy-single-spec" data-spec-id="${spec.draftId}">复制说明</button>
+      </div>
+    </article>
   `;
 }
 
@@ -760,9 +641,14 @@ function openForm(id, draftSpec = null) {
       }
     });
   } else {
+    elements.requirementForm.elements.product.value = "待补充";
+    elements.requirementForm.elements.sourceProject.value = "待补充";
+    elements.requirementForm.elements.requester.value = "待补充";
+    elements.requirementForm.elements.deliveryDirector.value = "待分配";
+    elements.requirementForm.elements.devManager.value = "待分配";
+    elements.requirementForm.elements.productManager.value = "待分配";
+    elements.requirementForm.elements.reviewStatus.value = "待评审";
     elements.requirementForm.elements.submittedAt.value = today();
-    elements.requirementForm.elements.plannedRelease.value = addDays(14);
-    elements.requirementForm.elements.status.value = "待评审";
     elements.requirementForm.elements.priority.value = "P2";
     elements.requirementForm.elements.type.value = "业务需求";
 
@@ -811,8 +697,9 @@ function handleFormSubmit(event) {
       if (item.id !== state.editingId) {
         return item;
       }
-      const auditTrail = [...item.auditTrail, `${timestamp} 更新需求信息，当前状态：${payload.status}`];
-      return { ...item, ...payload, auditTrail };
+      const statusLabel = payload.status || item.status || "待评审";
+      const auditTrail = [...item.auditTrail, `${timestamp} 更新需求信息，当前状态：${statusLabel}`];
+      return enrichRequirement({ ...item, ...payload, auditTrail });
     });
   } else {
     const nextId = buildRequirementId();
@@ -824,19 +711,14 @@ function handleFormSubmit(event) {
   render();
 }
 
-function buildRequirementId() {
-  const currentYear = new Date().getFullYear();
-  const serial = String(getNextRequirementSerial()).padStart(3, "0");
-  return `REQ-${currentYear}-${serial}`;
-}
-
-function getNextRequirementSerial() {
-  const currentYear = String(new Date().getFullYear());
-  return state.requirements.reduce((max, item) => {
-    const matched = String(item.id || "").match(/^REQ-(\d{4})-(\d+)$/);
-    if (!matched || matched[1] !== currentYear) return max;
-    return Math.max(max, Number(matched[2]));
-  }, 0) + 1;
+function buildRequirementId(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return `REQ-${year}${month}${day}${hours}${minutes}${seconds}`;
 }
 
 function resetSeedData() {
@@ -1183,9 +1065,31 @@ function today() {
 
 function cloneRequirements(items) {
   return items.map((item) => ({
-    ...item,
+    ...enrichRequirement(item),
     auditTrail: [...(item.auditTrail || [])]
   }));
+}
+
+function enrichRequirement(item) {
+  const department = item.department || "待补充";
+  const owner = item.owner || "待分配";
+  return {
+    ...item,
+    product: item.product || "待补充",
+    sourceProject: item.sourceProject || `${department}数字化项目`,
+    requester: item.requester || owner,
+    deliveryDirector: item.deliveryDirector || "待分配",
+    devManager: item.devManager || "待分配",
+    productManager: item.productManager || owner,
+    reviewStatus: item.reviewStatus || inferReviewStatus(item.status)
+  };
+}
+
+function inferReviewStatus(status) {
+  if (status === "开发中") return "开发中";
+  if (status === "已上线" || status === "已归档") return "已上线";
+  if (status === "设计中") return "已评审";
+  return "待评审";
 }
 
 function getTimestamp() {
@@ -1193,7 +1097,7 @@ function getTimestamp() {
 }
 
 function createRequirementRecord(payload, id, timestamp) {
-  return {
+  return enrichRequirement({
     id,
     title: payload.title || "未命名需求",
     type: payload.type || "业务需求",
@@ -1209,7 +1113,7 @@ function createRequirementRecord(payload, id, timestamp) {
     technicalNotes: listToMultiline(payload.technicalNotes),
     reviewNotes: listToMultiline(payload.reviewNotes),
     auditTrail: payload.auditTrail?.length ? [...payload.auditTrail] : [`${timestamp} 需求创建，提出部门：${payload.department || "待补充"}`]
-  };
+  });
 }
 
 function createRequirementRecordFromSpec(spec, id, timestamp) {
@@ -1228,11 +1132,9 @@ function createRequirementRecordFromSpec(spec, id, timestamp) {
 function createRequirementsFromSpecs(specs) {
   if (!specs.length) return;
 
-  const currentYear = new Date().getFullYear();
-  const startSerial = getNextRequirementSerial();
   const timestamp = getTimestamp();
   const createdPairs = specs.map((spec, index) => {
-    const id = `REQ-${currentYear}-${String(startSerial + index).padStart(3, "0")}`;
+    const id = buildRequirementId(new Date(Date.now() + index * 1000));
     return {
       draftId: spec.draftId,
       requirementId: id,
@@ -1252,7 +1154,7 @@ function createRequirementsFromSpecs(specs) {
 
   saveState();
   render();
-  switchSection("requirements");
+  alert(`已生成 ${createdRequirements.length} 条需求单。`);
 }
 
 function createSingleRequirementFromDraft(draftId) {
@@ -1803,14 +1705,17 @@ function matchKeyword(rawText, options) {
 
 function populateFormFromSpec(spec) {
   const form = elements.requirementForm.elements;
+  form.product.value = spec.product || "待补充";
   form.title.value = spec.title;
+  form.sourceProject.value = spec.sourceProject || `${spec.department || "待补充"}数字化项目`;
+  form.requester.value = spec.requester || spec.owner;
+  form.deliveryDirector.value = spec.deliveryDirector || "待分配";
+  form.devManager.value = spec.devManager || "待分配";
+  form.productManager.value = spec.productManager || spec.owner;
+  form.reviewStatus.value = spec.reviewStatus || "待评审";
   form.type.value = spec.type;
   form.priority.value = spec.priority;
-  form.status.value = spec.status;
-  form.department.value = spec.department;
-  form.owner.value = spec.owner;
   form.submittedAt.value = spec.submittedAt;
-  form.plannedRelease.value = spec.plannedRelease;
   form.background.value = spec.background;
   form.description.value = spec.description;
   form.acceptanceCriteria.value = listToMultiline(spec.acceptanceCriteria);
