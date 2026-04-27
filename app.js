@@ -111,6 +111,7 @@ const state = {
     search: "",
     reviewStatus: "all"
   },
+  requirementPage: 1,
   importHistorySearch: "",
   editingId: null,
   generatedSpecs: [],
@@ -123,6 +124,7 @@ const elements = {
   requirementsBoard: document.getElementById("requirementsBoard"),
   requirementsBoardSummary: document.getElementById("requirementsBoardSummary"),
   requirementsEmptyState: document.getElementById("requirementsEmptyState"),
+  requirementsPagination: document.getElementById("requirementsPagination"),
   intakeFileInput: document.getElementById("intakeFileInput"),
   intakeImportSummary: document.getElementById("intakeImportSummary"),
   importHistorySearchInput: document.getElementById("importHistorySearchInput"),
@@ -240,11 +242,13 @@ function bindEvents() {
   if (elements.listSearchInput) {
     elements.listSearchInput.addEventListener("input", (event) => {
       state.filters.search = event.target.value.trim();
+      state.requirementPage = 1;
       renderRequirementsBoard();
     });
   }
   elements.listReviewStatusFilter?.addEventListener("change", (event) => {
     state.filters.reviewStatus = event.target.value;
+    state.requirementPage = 1;
     renderRequirementsBoard();
   });
 
@@ -375,16 +379,47 @@ function renderRequirementCard(item, options = {}) {
 
 function renderRequirementsBoard() {
   const rows = getFilteredRequirements();
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  state.requirementPage = Math.min(state.requirementPage, totalPages);
+  const startIndex = (state.requirementPage - 1) * pageSize;
+  const pageRows = rows.slice(startIndex, startIndex + pageSize);
   elements.requirementsBoardSummary.innerHTML = [
     `<span class="badge badge-type">共 ${rows.length} 条需求单</span>`,
     state.filters.reviewStatus !== "all" ? `<span class="badge badge-type">评审状态 ${state.filters.reviewStatus}</span>` : ""
   ].join("");
 
   elements.requirementsEmptyState.classList.toggle("hidden", rows.length !== 0);
-  elements.requirementsBoard.innerHTML = rows
+  elements.requirementsBoard.innerHTML = pageRows
     .map((item) => renderRequirementTableRow(item))
     .join("");
+  renderRequirementsPagination(rows.length, totalPages);
   bindInlineActions();
+}
+
+function renderRequirementsPagination(totalCount, totalPages) {
+  if (!elements.requirementsPagination) return;
+  const shouldShow = totalCount > 10;
+  elements.requirementsPagination.classList.toggle("hidden", !shouldShow);
+  if (!shouldShow) {
+    elements.requirementsPagination.innerHTML = "";
+    return;
+  }
+
+  elements.requirementsPagination.innerHTML = `
+    <button class="ghost-button" type="button" data-page-action="prev" ${state.requirementPage <= 1 ? "disabled" : ""}>上一页</button>
+    <span class="pagination-info">第 ${state.requirementPage} / ${totalPages} 页</span>
+    <button class="ghost-button" type="button" data-page-action="next" ${state.requirementPage >= totalPages ? "disabled" : ""}>下一页</button>
+  `;
+
+  elements.requirementsPagination.querySelectorAll("[data-page-action]").forEach((button) => {
+    button.onclick = () => {
+      const nextPage = button.dataset.pageAction === "prev" ? state.requirementPage - 1 : state.requirementPage + 1;
+      if (nextPage < 1 || nextPage > totalPages) return;
+      state.requirementPage = nextPage;
+      renderRequirementsBoard();
+    };
+  });
 }
 
 function getFilteredRequirements() {
@@ -1108,6 +1143,7 @@ function createRequirementRecord(payload, id, timestamp) {
     submittedAt: payload.submittedAt || today(),
     plannedRelease: normalizeDateHint(payload.plannedRelease) || addDays(14),
     background: payload.background || "",
+    impactScope: payload.impactScope || "",
     description: payload.description || "",
     acceptanceCriteria: listToMultiline(payload.acceptanceCriteria),
     technicalNotes: listToMultiline(payload.technicalNotes),
@@ -1122,7 +1158,8 @@ function createRequirementRecordFromSpec(spec, id, timestamp) {
       ...spec,
       acceptanceCriteria: spec.acceptanceCriteria,
       technicalNotes: spec.technicalNotes,
-      reviewNotes: spec.reviewNotes
+      reviewNotes: spec.reviewNotes,
+      impactScope: spec.impactScope
     },
     id,
     timestamp
@@ -1717,6 +1754,7 @@ function populateFormFromSpec(spec) {
   form.priority.value = spec.priority;
   form.submittedAt.value = spec.submittedAt;
   form.background.value = spec.background;
+  form.impactScope.value = spec.impactScope || "";
   form.description.value = spec.description;
   form.acceptanceCriteria.value = listToMultiline(spec.acceptanceCriteria);
   form.technicalNotes.value = listToMultiline(spec.technicalNotes);
